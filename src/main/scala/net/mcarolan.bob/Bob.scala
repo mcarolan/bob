@@ -8,9 +8,12 @@ import scalaz.stream._
 
 object RaspberryPi {
 
+  sealed trait State
+  case object High extends State
+  case object Low extends State
+
   trait DigitalOutput {
-    def high: Task[Unit]
-    def low: Task[Unit]
+    def enterState(state: State): Task[Unit]
   }
 
   trait Controller {
@@ -19,20 +22,19 @@ object RaspberryPi {
     def shutdown: Task[Unit]
     def resetMotors: Task[Unit] =
       for {
-        _ <- leftMotor.low
-        _ <- rightMotor.low
+        _ <- leftMotor.enterState(Low)
+        _ <- rightMotor.enterState(Low)
       }
         yield ()
   }
 
   case class PiDigitalOutput(pin: GpioPinDigitalOutput) extends DigitalOutput {
 
-    override def high: Task[Unit] = Task {
-      pin.high()
-    }
-
-    override def low: Task[Unit] = Task {
-      pin.low()
+    override def enterState(state: State): Task[Unit] = Task {
+      state match {
+        case High => pin.high()
+        case Low => pin.low()
+      }
     }
 
   }
@@ -54,34 +56,18 @@ object BobMain extends App {
 
   import RaspberryPi._
 
-  sealed trait Action extends ((Controller) => Task[Unit])
-
-  object Forward extends Action {
-    override def apply(controller: Controller): Task[Unit] =
+  case class Action(leftMotorState: State, rightMotorState: State) extends ((Controller) => Task[Unit]) {
+    def apply(controller: Controller): Task[Unit] =
       for {
-        _ <- controller.leftMotor.high
-        _ <- controller.rightMotor.high
+        _ <- controller.leftMotor enterState leftMotorState
+        _ <- controller.rightMotor enterState rightMotorState
       }
         yield ()
   }
 
-  object Left extends Action {
-    override def apply(controller: Controller): Task[Unit] =
-      for {
-        _ <- controller.leftMotor.high
-        _ <- controller.rightMotor.low
-      }
-        yield ()
-  }
-
-  object Right extends Action {
-    override def apply(controller: Controller): Task[Unit] =
-      for {
-        _ <- controller.leftMotor.low
-        _ <- controller.leftMotor.high
-      }
-        yield ()
-  }
+  object Forward extends Action(High, High)
+  object Left extends Action(High, Low)
+  object Right extends Action(Low, High)
 
   case class Command(action: Action, duration: Duration)
 
@@ -101,11 +87,11 @@ object BobMain extends App {
     }
 
   def interpret(controller: Controller)(command: Command): Task[Unit] =
-       for {
-         _ <- command.action(controller)
-         _ <- Task { Thread.sleep(command.duration.toMillis) }
-         _ <- controller.resetMotors
-       }
-         yield ()
+    for {
+      _ <- command.action(controller)
+      _ <- Task { Thread.sleep(command.duration.toMillis) }
+      _ <- controller.resetMotors
+    }
+      yield ()
 
 }

@@ -1,6 +1,6 @@
 package net.mcarolan.bob
 
-import net.mcarolan.bob.BobMain.{Forward, Left, Command}
+import net.mcarolan.bob.BobMain._
 import net.mcarolan.bob.RaspberryPi.{DigitalOutput, Controller}
 import org.scalatest.{Matchers, FunSuite}
 
@@ -10,23 +10,21 @@ import scala.concurrent.duration._
 
 case class StubController() extends Controller {
 
-  var leftMotorSignals: Seq[Boolean] = Seq.empty
-  var rightMotorSignals: Seq[Boolean] = Seq.empty
+  import RaspberryPi.State
+
+  var leftMotorSignals: Seq[State] = Seq.empty
+  var rightMotorSignals: Seq[State] = Seq.empty
   var shutdownCalled = false
 
   override val leftMotor: DigitalOutput = new DigitalOutput {
 
-    override def high: Task[Unit] = Task { leftMotorSignals = leftMotorSignals :+ true }
-
-    override def low: Task[Unit] = Task { leftMotorSignals = leftMotorSignals :+ false }
+    override def enterState(state: State): Task[Unit] = Task { leftMotorSignals = leftMotorSignals :+ state }
 
   }
 
   override val rightMotor: DigitalOutput = new DigitalOutput {
 
-    override def high: Task[Unit] = Task { rightMotorSignals = rightMotorSignals :+ true }
-
-    override def low: Task[Unit] = Task { rightMotorSignals = rightMotorSignals :+ false }
+    override def enterState(state: State): Task[Unit] = Task { rightMotorSignals = rightMotorSignals :+ state }
 
   }
 
@@ -38,6 +36,8 @@ case class StubController() extends Controller {
 
 class BobTest extends FunSuite with Matchers {
 
+  import RaspberryPi.{State, High, Low}
+
   test("Bob can interpret a single Forward command") {
     val controller = StubController()
     val bob = BobMain.bob(controller)
@@ -46,8 +46,8 @@ class BobTest extends FunSuite with Matchers {
 
     (commands to bob).run.run
 
-    controller.leftMotorSignals shouldBe Seq(true, false, false)
-    controller.rightMotorSignals shouldBe Seq(true, false, false)
+    controller.leftMotorSignals shouldBe Seq(High, Low, Low)
+    controller.rightMotorSignals shouldBe Seq(High, Low, Low)
 
     controller.shutdownCalled shouldBe true
   }
@@ -60,8 +60,8 @@ class BobTest extends FunSuite with Matchers {
 
     (commands to bob).run.run
 
-    controller.leftMotorSignals shouldBe Seq(true, false, true, false, false)
-    controller.rightMotorSignals shouldBe Seq(true, false, false, false, false)
+    controller.leftMotorSignals shouldBe Seq(High, Low, High, Low, Low)
+    controller.rightMotorSignals shouldBe Seq(High, Low, Low, Low, Low)
 
     controller.shutdownCalled shouldBe true
   }
