@@ -6,6 +6,10 @@ import scala.concurrent.duration._
 import scala.io.StdIn
 import scalaz.concurrent.Task
 import scalaz.stream._
+import org.http4s.server.blaze.BlazeBuilder
+import org.http4s._
+import org.http4s.dsl._
+import org.http4s.server._
 
 object RaspberryPi {
 
@@ -123,14 +127,27 @@ object BobMain extends App {
     }
       yield ()
 
-  val readChar: Process[Task, Char] = Process repeatEval Task { StdIn.readChar() }
+  val commands = async.boundedQueue[Command](10)
 
-  val readCommand: Process[Task, Command] = readChar collect {
-    case 'w' => Command(Forward, 1 second)
-    case 'a' => Command(Left, 1 second)
-    case 'd' => Command(Right, 1 second)
+  val bobRoute = HttpService {
+
+    case PUT -> Root / "left" =>
+      commands.enqueueOne(Command(Left, 1 second)).flatMap(_ => Ok("Going left"))
+
+    case PUT -> Root / "right" =>
+      commands.enqueueOne(Command(Right, 1 second)).flatMap(_ => Ok("All right"))
+
+    case PUT -> Root / "forward" =>
+      commands.enqueueOne(Command(Forward, 1 second)).flatMap(_ => Ok("Straight up"))
+
   }
 
-  (readCommand to bob(StubController())).run.run
+  val bobServer: Process[Task, Server] = Process eval (BlazeBuilder.bindHttp(8080)
+    .mountService(bobRoute, "/")
+    .start)
+
+  val runCommands = (commands.dequeue to bob(StubController()))
+
+  (bobServer merge runCommands).run.run
 
 }
