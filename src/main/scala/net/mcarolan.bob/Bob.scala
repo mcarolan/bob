@@ -85,7 +85,7 @@ object BobMain extends App {
 
   case class Command(action: Action, duration: Duration)
 
-  val cleanUp: Controller => Task[Unit] = { controller =>
+  def cleanUp(controller: Controller): Task[Unit] =
     for {
       _ <- Task { println("Turning bob off...") }
       _ <- controller.resetMotors
@@ -93,17 +93,14 @@ object BobMain extends App {
       _ <- Task { println("Bob turned off") }
     }
       yield ()
-  }
 
-  def bob(controller: Controller): Sink[Task, Command] = {
+  def bob(controller: => Controller): Sink[Task, Command] =
     Process.await(Task(controller)) { controller =>
-      Process repeatEval Task { command: Command =>
-        interpret(controller, command)
-      } onComplete (Process eval_ cleanUp(controller))
+      val interpreter = Process repeatEval Task(interpret(controller)_)
+      interpreter onComplete (Process eval_ cleanUp(controller))
     }
-  }
 
-  def interpret(controller: Controller, command: Command): Task[Unit] =
+  def interpret(controller: Controller)(command: Command): Task[Unit] =
        for {
          _ <- command.action(controller)
          _ <- Task { Thread.sleep(command.duration.toMillis) }

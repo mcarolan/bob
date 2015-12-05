@@ -46,8 +46,10 @@ class BobTest extends FunSuite with Matchers {
 
     (commands to bob).run.run
 
-    controller.leftMotorSignals shouldBe Seq(true, false)
-    controller.rightMotorSignals shouldBe Seq(true, false)
+    controller.leftMotorSignals shouldBe Seq(true, false, false)
+    controller.rightMotorSignals shouldBe Seq(true, false, false)
+
+    controller.shutdownCalled shouldBe true
   }
 
   test("Bob can interpret multiple commands: a Forward followed by a Left") {
@@ -58,8 +60,10 @@ class BobTest extends FunSuite with Matchers {
 
     (commands to bob).run.run
 
-    controller.leftMotorSignals shouldBe Seq(true, false, true, false)
-    controller.rightMotorSignals shouldBe Seq(true, false, false, false)
+    controller.leftMotorSignals shouldBe Seq(true, false, true, false, false)
+    controller.rightMotorSignals shouldBe Seq(true, false, false, false, false)
+
+    controller.shutdownCalled shouldBe true
   }
 
 }
