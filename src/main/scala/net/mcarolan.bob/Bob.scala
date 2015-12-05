@@ -1,22 +1,19 @@
 package net.mcarolan.bob
 
-import java.util.concurrent.TimeoutException
-
 import com.pi4j.io.gpio._
 
 import scala.concurrent.duration.Duration
 import scalaz.concurrent.Task
 import scalaz.stream._
-import scala.concurrent.duration._
 
-object BobMain extends App {
+object RaspberryPi {
 
-  sealed trait DigitalOutput {
+  trait DigitalOutput {
     def high: Task[Unit]
     def low: Task[Unit]
   }
 
-  sealed trait Controller {
+  trait Controller {
     val leftMotor: DigitalOutput
     val rightMotor: DigitalOutput
     def shutdown: Task[Unit]
@@ -26,20 +23,6 @@ object BobMain extends App {
         _ <- rightMotor.low
       }
         yield ()
-  }
-
-  case class StubDigitalOutput(pin: Pin) extends DigitalOutput {
-
-    println(s"**** USING STUB MOTOR for ${pin.getName}****")
-
-    def high: Task[Unit] = Task {
-      println(s"high ${pin.getName}")
-    }
-
-    def low: Task[Unit] = Task {
-      println(s"low ${pin.getName}")
-    }
-
   }
 
   case class PiDigitalOutput(pin: GpioPinDigitalOutput) extends DigitalOutput {
@@ -65,76 +48,67 @@ object BobMain extends App {
 
   }
 
-  case object StubController extends Controller {
-    println("**** USING STUB CONTROLLER ****")
+}
 
-    val leftMotor = StubDigitalOutput(RaspiPin.GPIO_01)
-    val rightMotor = StubDigitalOutput(RaspiPin.GPIO_07)
+object BobMain extends App {
 
-    override def shutdown: Task[Unit] = Task {
-      println("shutting down controller")
-    }
-  }
+  import RaspberryPi._
 
-  case class Bob(controller: Controller)
-
-  sealed trait Action extends ((Bob) => Task[Unit])
+  sealed trait Action extends ((Controller) => Task[Unit])
 
   object Forward extends Action {
-    override def apply(bob: Bob): Task[Unit] =
+    override def apply(controller: Controller): Task[Unit] =
       for {
-        _ <- bob.controller.leftMotor.high
-        _ <- bob.controller.rightMotor.high
+        _ <- controller.leftMotor.high
+        _ <- controller.rightMotor.high
       }
         yield ()
   }
 
   object Left extends Action {
-    override def apply(bob: Bob): Task[Unit] =
-      bob.controller.leftMotor.high.map(_=>())
+    override def apply(controller: Controller): Task[Unit] =
+      for {
+        _ <- controller.leftMotor.high
+        _ <- controller.rightMotor.low
+      }
+        yield ()
   }
 
   object Right extends Action {
-    override def apply(bob: Bob): Task[Unit] =
-      bob.controller.rightMotor.high.map(_=>())
+    override def apply(controller: Controller): Task[Unit] =
+      for {
+        _ <- controller.leftMotor.low
+        _ <- controller.leftMotor.high
+      }
+        yield ()
   }
 
   case class Command(action: Action, duration: Duration)
 
-  val cleanUp: Bob => Task[Unit] = { bob =>
+  val cleanUp: Controller => Task[Unit] = { controller =>
     for {
       _ <- Task { println("Turning bob off...") }
-      _ <- bob.controller.resetMotors
-      _ <- bob.controller.shutdown
+      _ <- controller.resetMotors
+      _ <- controller.shutdown
       _ <- Task { println("Bob turned off") }
     }
       yield ()
   }
 
-  val createBob: Task[Bob] =
-    for {
-      _ <- Task { println("Creating bob...") }
-      controller = StubController
+  def bob(controller: Controller): Sink[Task, Command] = {
+    Process.await(Task(controller)) { controller =>
+      Process repeatEval Task { command: Command =>
+        interpret(controller, command)
+      } onComplete (Process eval_ cleanUp(controller))
     }
-      yield Bob(controller)
-
-  val commands: Process[Task, Command] = Process(Command(Forward, 10 seconds), Command(Forward, 5 seconds))
-
-  val bob: Sink[Task, Command] = Process.await(createBob) { bob =>
-    Process repeatEval Task { command: Command =>
-      interpret(bob, command)
-    } onComplete (Process eval_ cleanUp(bob))
   }
 
-  def interpret(bob: Bob, command: Command): Task[Unit] =
+  def interpret(controller: Controller, command: Command): Task[Unit] =
        for {
-         _ <- bob.controller.resetMotors
-         _ <- command.action(bob)
+         _ <- command.action(controller)
          _ <- Task { Thread.sleep(command.duration.toMillis) }
-         _ <- bob.controller.resetMotors
+         _ <- controller.resetMotors
        }
          yield ()
-
-  (commands to bob).run.run
 
 }

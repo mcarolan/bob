@@ -6,6 +6,7 @@ object BobBuild extends Build {
   object Versions {
     val scalaz = "7.1.3"
     val scalazStream = "0.7.3a"
+    val scalatest = "2.2.1"
   }
 
   lazy val bob3 = Project(
@@ -20,7 +21,8 @@ object BobBuild extends Build {
       libraryDependencies += "org.scalaz" %% "scalaz-core" % Versions.scalaz,
       libraryDependencies += "org.scalaz" %% "scalaz-concurrent" % Versions.scalaz,
       libraryDependencies += "org.scalaz.stream" %% "scalaz-stream" % Versions.scalazStream,
-      libraryDependencies += "com.pi4j" % "pi4j-core" % "1.0"
+      libraryDependencies += "com.pi4j" % "pi4j-core" % "1.0",
+      libraryDependencies += "org.scalatest" %% "scalatest" % Versions.scalatest % "test"
     )
   )
 }
