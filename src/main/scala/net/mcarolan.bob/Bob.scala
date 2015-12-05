@@ -63,6 +63,9 @@ object BobMain extends App {
         _ <- controller.rightMotor enterState rightMotorState
       }
         yield ()
+
+      override def toString =
+        s"left motor = $leftMotorState, right motor = $rightMotorState"
   }
 
   object Forward extends Action(High, High)
@@ -88,6 +91,7 @@ object BobMain extends App {
 
   def interpret(controller: Controller)(command: Command): Task[Unit] =
     for {
+      _ <- Task { println(command) }
       _ <- command.action(controller)
       _ <- Task { Thread.sleep(command.duration.toMillis) }
       _ <- controller.resetMotors
