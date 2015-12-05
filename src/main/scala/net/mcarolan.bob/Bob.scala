@@ -2,7 +2,8 @@ package net.mcarolan.bob
 
 import com.pi4j.io.gpio._
 
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
+import scala.io.StdIn
 import scalaz.concurrent.Task
 import scalaz.stream._
 
@@ -46,6 +47,30 @@ object RaspberryPi {
 
     override def shutdown: Task[Unit] = Task {
       controller.shutdown()
+    }
+
+  }
+
+  case class StubController() extends Controller {
+
+    var leftMotorSignals: Seq[State] = Seq.empty
+    var rightMotorSignals: Seq[State] = Seq.empty
+    var shutdownCalled = false
+
+    override val leftMotor: DigitalOutput = new DigitalOutput {
+
+      override def enterState(state: State): Task[Unit] = Task { leftMotorSignals = leftMotorSignals :+ state }
+
+    }
+
+    override val rightMotor: DigitalOutput = new DigitalOutput {
+
+      override def enterState(state: State): Task[Unit] = Task { rightMotorSignals = rightMotorSignals :+ state }
+
+    }
+
+    override def shutdown: Task[Unit] = Task {
+      shutdownCalled = true
     }
 
   }
@@ -97,5 +122,15 @@ object BobMain extends App {
       _ <- controller.resetMotors
     }
       yield ()
+
+  val readChar: Process[Task, Char] = Process repeatEval Task { StdIn.readChar() }
+
+  val readCommand: Process[Task, Command] = readChar collect {
+    case 'w' => Command(Forward, 1 second)
+    case 'a' => Command(Left, 1 second)
+    case 'd' => Command(Right, 1 second)
+  }
+
+  (readCommand to bob(StubController())).run.run
 
 }

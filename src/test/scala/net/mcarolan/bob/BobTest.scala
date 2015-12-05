@@ -8,32 +8,6 @@ import scalaz.concurrent.Task
 import scalaz.stream._
 import scala.concurrent.duration._
 
-case class StubController() extends Controller {
-
-  import RaspberryPi.State
-
-  var leftMotorSignals: Seq[State] = Seq.empty
-  var rightMotorSignals: Seq[State] = Seq.empty
-  var shutdownCalled = false
-
-  override val leftMotor: DigitalOutput = new DigitalOutput {
-
-    override def enterState(state: State): Task[Unit] = Task { leftMotorSignals = leftMotorSignals :+ state }
-
-  }
-
-  override val rightMotor: DigitalOutput = new DigitalOutput {
-
-    override def enterState(state: State): Task[Unit] = Task { rightMotorSignals = rightMotorSignals :+ state }
-
-  }
-
-  override def shutdown: Task[Unit] = Task {
-    shutdownCalled = true
-  }
-
-}
-
 class BobTest extends FunSuite with Matchers {
 
   import RaspberryPi.{State, High, Low}
