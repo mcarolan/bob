@@ -1,1 +1,28 @@
-hi
+<html>
+  <head>
+    <script src="js/jquery-2.1.4.min.js"></script>
+    <script>
+      function move(direction) {
+        console.log('moving ' + direction);
+        $.post('/api/' + direction);
+      }
+
+      $(document).on('keydown', function(e) {
+        switch (e.keyCode) {
+          case 38:
+            move('forward');
+            break;
+          case 37:
+            move('left');
+            break;
+          case 39:
+            move('right');
+            break;
+        }
+      });
+    </script>
+  </head>
+  <body>
+    Use ze arrow keys to control bob
+  </body>
+</html>
