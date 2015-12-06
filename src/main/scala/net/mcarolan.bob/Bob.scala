@@ -131,19 +131,33 @@ object BobMain extends App {
 
   val bobRoute = HttpService {
 
-    case PUT -> Root / "left" =>
+    case POST -> Root / "left" =>
       commands.enqueueOne(Command(Left, 1 second)).flatMap(_ => Ok("Going left"))
 
-    case PUT -> Root / "right" =>
+    case POST -> Root / "right" =>
       commands.enqueueOne(Command(Right, 1 second)).flatMap(_ => Ok("All right"))
 
-    case PUT -> Root / "forward" =>
+    case POST -> Root / "forward" =>
       commands.enqueueOne(Command(Forward, 1 second)).flatMap(_ => Ok("Straight up"))
 
   }
 
+  def sendResource(request: Request, path: String): Task[Response] =
+    StaticFile.fromResource(path, Some(request)).fold(NotFound())(Task.now)
+
+  val staticRoute = HttpService {
+
+    case req @ (GET -> Root) =>
+      sendResource(req, "/index.html")
+
+    case req @ (GET -> path) =>
+      sendResource(req, path.toString)
+
+  }
+
   val bobServer: Process[Task, Server] = Process eval (BlazeBuilder.bindHttp(8080)
-    .mountService(bobRoute, "/")
+    .mountService(staticRoute, "/")
+    .mountService(bobRoute, "/api")
     .start)
 
   val runCommands = (commands.dequeue to bob(StubController()))
