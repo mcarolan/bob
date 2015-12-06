@@ -1,10 +1,15 @@
 <html>
   <head>
     <script src="js/jquery-2.1.4.min.js"></script>
+    <script src="js/jquery.color-2.1.2.min.js"></script>
     <script>
       function move(direction) {
         console.log('moving ' + direction);
         $.post('/api/' + direction);
+        var button = $('#' + direction + 'Button');
+        button.animate({ backgroundColor: "#ff0000" }, 1000, "swing", function() {
+          button.animate({ backgroundColor: "" }, 1000);
+        });
       }
 
       $(document).on('keydown', function(e) {
@@ -21,8 +26,52 @@
         }
       });
     </script>
+    <style type="text/css">
+      #forwardButton {
+        position: absolute;
+        top: 20;
+        left: 50%;
+      }
+      #leftButton {
+        position: absolute;
+        top: 50%;
+        left: 20;
+      }
+      #rightButton {
+        position: absolute;
+        top: 50%;
+        right: 20;
+      }
+      .container {
+        display: table;
+        height: 100%;
+        position: absolute;
+        overflow: hidden;
+        width: 100%;}
+      .helper {
+        #position: absolute; /*a variation of an "lte ie7" hack*/
+        #top: 50%;
+        display: table-cell;
+        vertical-align: middle;}
+      .content {
+        #position: relative;
+        #top: -50%;
+        margin:0 auto;
+        width:200px;}
+      #instructions {
+        text-align: center;
+        font-weight: bold;
+      }
+    </style>
   </head>
   <body>
-    Use ze arrow keys to control bob
+    <input type="button" id="forwardButton" onclick="javascript: move('forward');" value="Forward" />
+    <input type="button" id="leftButton" onclick="javascript: move('left');" value="Left" />
+    <input type="button" id="rightButton" onclick="javascript: move('right');" value="Right" />
+    <div class="container">
+      <div class="helper">
+        <div class="content"><span id="instructions">Use the arrow keys, or click the buttons to move bob</span></div>
+      </div>
+    </div>
   </body>
 </html>
