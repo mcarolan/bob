@@ -16,12 +16,12 @@ class BobTest extends FunSuite with Matchers {
     val controller = RaspberryPi.StubController()
     val bob = BobMain.bob(controller)
 
-    val commands: Process[Task, Command] = Process(Command(Forward, 1 second))
+    val commands: Process[Task, Action] = Process(Forward, Halt)
 
     (commands to bob).run.run
 
-    controller.leftMotorSignals shouldBe Seq(High, Low, Low)
-    controller.rightMotorSignals shouldBe Seq(High, Low, Low)
+    withClue("left motor signals") { controller.leftMotorSignals shouldBe Seq(High, Low, Low) }
+    withClue("right motor signals") { controller.rightMotorSignals shouldBe Seq(High, Low, Low) }
 
     controller.shutdownCalled shouldBe true
   }
@@ -30,12 +30,12 @@ class BobTest extends FunSuite with Matchers {
     val controller = RaspberryPi.StubController()
     val bob = BobMain.bob(controller)
 
-    val commands: Process[Task, Command] = Process(Command(Forward, 1 second), Command(Left, 1 second))
+    val commands: Process[Task, Action] = Process(Forward, Halt, Left, Halt)
 
     (commands to bob).run.run
 
-    controller.leftMotorSignals shouldBe Seq(High, Low, High, Low, Low)
-    controller.rightMotorSignals shouldBe Seq(High, Low, Low, Low, Low)
+    withClue("left motor signals") { controller.leftMotorSignals shouldBe Seq(High, Low, High, Low, Low) }
+    withClue("right moror signals") { controller.rightMotorSignals shouldBe Seq(High, Low, Low, Low, Low) }
 
     controller.shutdownCalled shouldBe true
   }

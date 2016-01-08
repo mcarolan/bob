@@ -100,8 +100,7 @@ object BobMain extends App {
   object Forward extends Action(High, High)
   object Left extends Action(High, Low)
   object Right extends Action(Low, High)
-
-  case class Command(action: Action, duration: Duration)
+  object Halt extends Action(Low, Low)
 
   def cleanUp(controller: Controller): Task[Unit] =
     for {
@@ -112,33 +111,34 @@ object BobMain extends App {
     }
       yield ()
 
-  def bob(controller: => Controller): Sink[Task, Command] =
+  def bob(controller: => Controller): Sink[Task, Action] =
     Process.await(Task(controller)) { controller =>
       val interpreter = Process repeatEval Task(interpret(controller)_)
       interpreter onComplete (Process eval_ cleanUp(controller))
     }
 
-  def interpret(controller: Controller)(command: Command): Task[Unit] =
+  def interpret(controller: Controller)(action: Action): Task[Unit] =
     for {
-      _ <- Task { println(command) }
-      _ <- command.action(controller)
-      _ <- Task { Thread.sleep(command.duration.toMillis) }
-      _ <- controller.resetMotors
+      _ <- Task { println(action) }
+      _ <- action(controller)
     }
       yield ()
 
-  val commands = async.boundedQueue[Command](10)
+  val commands = async.boundedQueue[Action](10)
 
   val bobRoute = HttpService {
 
     case POST -> Root / "left" =>
-      commands.enqueueOne(Command(Left, 1 second)).flatMap(_ => Ok("Going left"))
+      commands.enqueueOne(Left).flatMap(_ => Ok("Going left"))
 
     case POST -> Root / "right" =>
-      commands.enqueueOne(Command(Right, 1 second)).flatMap(_ => Ok("All right"))
+      commands.enqueueOne(Right).flatMap(_ => Ok("All right"))
 
     case POST -> Root / "forward" =>
-      commands.enqueueOne(Command(Forward, 1 second)).flatMap(_ => Ok("Straight up"))
+      commands.enqueueOne(Forward).flatMap(_ => Ok("Straight up"))
+
+    case POST -> Root / "halt" =>
+      commands.enqueueOne(Halt).flatMap(_ => Ok("Stop right there!"))
 
   }
 
@@ -155,7 +155,7 @@ object BobMain extends App {
 
   }
 
-  val bobServer: Process[Task, Server] = Process eval (BlazeBuilder.bindHttp(8080)
+  val bobServer: Process[Task, Server] = Process eval (BlazeBuilder.bindHttp(8080, "0.0.0.0")
     .mountService(staticRoute, "/")
     .mountService(bobRoute, "/api")
     .start)

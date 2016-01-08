@@ -12,8 +12,14 @@
         });
       }
 
-      $(document).on('keydown', function(e) {
-        switch (e.keyCode) {
+      var lastEvent = null;
+
+      $(document).keydown(function(event) {
+        if (lastEvent && lastEvent.which == event.which) {
+          return;
+        }
+        lastEvent = event;
+        switch (event.which) {
           case 38:
             move('forward');
             break;
@@ -24,6 +30,11 @@
             move('right');
             break;
         }
+      });
+
+      $(document).keyup(function() {
+        move('halt');
+        lastEvent = null;
       });
 
       var webSocket;
