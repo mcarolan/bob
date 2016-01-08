@@ -160,7 +160,7 @@ object BobMain extends App {
     .mountService(bobRoute, "/api")
     .start)
 
-  val runCommands = (commands.dequeue to bob(StubController()))
+  val runCommands = (commands.dequeue to bob(PiController(GpioFactory.getInstance())))
 
   (bobServer merge runCommands).run.run
 

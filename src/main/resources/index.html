@@ -25,6 +25,24 @@
             break;
         }
       });
+
+      var webSocket;
+			function ws(){
+				webSocket=webSocket = new WebSocket("ws://"+window.location.hostname+":9000/");
+				webSocket.onopen=function(){
+					console.log("opened");
+				}
+				webSocket.onmessage=function(data){
+					image = $('#c')[0]
+					image.src='data:image/jpeg;base64,'+ data.data
+				}
+				webSocket.ondata=function(){
+					console.log("msg received");
+				}
+			}
+			$(document).ready(function(){
+				ws();
+			});
     </script>
     <style type="text/css">
       #forwardButton {
@@ -57,12 +75,15 @@
         #position: relative;
         #top: -50%;
         margin:0 auto;
-        width:200px;}
-      #instructions {
-        text-align: center;
-        font-weight: bold;
+        width: 640;
+      }
+      #c {
+        width: 640;
+        height: 480;
+        border: solid 1px #666666;
       }
     </style>
+    <title>Bob Controller</title>
   </head>
   <body>
     <input type="button" id="forwardButton" onclick="javascript: move('forward');" value="Forward" />
@@ -70,7 +91,9 @@
     <input type="button" id="rightButton" onclick="javascript: move('right');" value="Right" />
     <div class="container">
       <div class="helper">
-        <div class="content"><span id="instructions">Use the arrow keys, or click the buttons to move bob</span></div>
+        <div class="content">
+          <img id="c" />
+        </div>
       </div>
     </div>
   </body>

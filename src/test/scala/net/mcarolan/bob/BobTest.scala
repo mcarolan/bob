@@ -13,7 +13,7 @@ class BobTest extends FunSuite with Matchers {
   import RaspberryPi.{State, High, Low}
 
   test("Bob can interpret a single Forward command") {
-    val controller = StubController()
+    val controller = RaspberryPi.StubController()
     val bob = BobMain.bob(controller)
 
     val commands: Process[Task, Command] = Process(Command(Forward, 1 second))
@@ -27,7 +27,7 @@ class BobTest extends FunSuite with Matchers {
   }
 
   test("Bob can interpret multiple commands: a Forward followed by a Left") {
-    val controller = StubController()
+    val controller = RaspberryPi.StubController()
     val bob = BobMain.bob(controller)
 
     val commands: Process[Task, Command] = Process(Command(Forward, 1 second), Command(Left, 1 second))
