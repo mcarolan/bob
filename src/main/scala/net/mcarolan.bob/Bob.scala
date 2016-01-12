@@ -25,12 +25,6 @@ object RaspberryPi {
     val leftMotor: DigitalOutput
     val rightMotor: DigitalOutput
     def shutdown: Task[Unit]
-    def resetMotors: Task[Unit] =
-      for {
-        _ <- leftMotor.enterState(Low)
-        _ <- rightMotor.enterState(Low)
-      }
-        yield ()
   }
 
   case class PiDigitalOutput(pin: GpioPinDigitalOutput) extends DigitalOutput {
@@ -46,8 +40,8 @@ object RaspberryPi {
 
   case class PiController(controller: GpioController) extends Controller {
 
-    val leftMotor = PiDigitalOutput(controller.provisionDigitalOutputPin(RaspiPin.GPIO_01, PinState.LOW))
-    val rightMotor = PiDigitalOutput(controller.provisionDigitalOutputPin(RaspiPin.GPIO_07, PinState.LOW))
+    val leftMotor = PiDigitalOutput(controller.provisionDigitalOutputPin(RaspiPin.GPIO_07, PinState.LOW))
+    val rightMotor = PiDigitalOutput(controller.provisionDigitalOutputPin(RaspiPin.GPIO_01, PinState.LOW))
 
     override def shutdown: Task[Unit] = Task {
       controller.shutdown()
@@ -85,7 +79,7 @@ object BobMain extends App {
 
   import RaspberryPi._
 
-  case class Action(leftMotorState: State, rightMotorState: State) extends ((Controller) => Task[Unit]) {
+  class Action(leftMotorState: State, rightMotorState: State) extends ((Controller) => Task[Unit]) {
     def apply(controller: Controller): Task[Unit] =
       for {
         _ <- controller.leftMotor enterState leftMotorState
@@ -98,14 +92,14 @@ object BobMain extends App {
   }
 
   object Forward extends Action(High, High)
-  object Left extends Action(High, Low)
-  object Right extends Action(Low, High)
+  object Left extends Action(Low, High)
+  object Right extends Action(High, Low)
   object Halt extends Action(Low, Low)
 
   def cleanUp(controller: Controller): Task[Unit] =
     for {
       _ <- Task { println("Turning bob off...") }
-      _ <- controller.resetMotors
+      _ <- Halt(controller)
       _ <- controller.shutdown
       _ <- Task { println("Bob turned off") }
     }
@@ -113,7 +107,7 @@ object BobMain extends App {
 
   def bob(controller: => Controller): Sink[Task, Action] =
     Process.await(Task(controller)) { controller =>
-      val interpreter = Process repeatEval Task(interpret(controller)_)
+      val interpreter: Sink[Task, Action] = Process repeatEval Task(interpret(controller)_)
       interpreter onComplete (Process eval_ cleanUp(controller))
     }
 
@@ -124,21 +118,20 @@ object BobMain extends App {
     }
       yield ()
 
-  val commands = async.boundedQueue[Action](10)
+  val actions = async.boundedQueue[Action](10)
+
+  def processActionRequest(action: Action): Task[Response] =
+    actions.enqueueOne(action).flatMap(_ => Ok())
 
   val bobRoute = HttpService {
 
-    case POST -> Root / "left" =>
-      commands.enqueueOne(Left).flatMap(_ => Ok("Going left"))
+    case POST -> Root / "left" => processActionRequest(Left)
 
-    case POST -> Root / "right" =>
-      commands.enqueueOne(Right).flatMap(_ => Ok("All right"))
+    case POST -> Root / "right" => processActionRequest(Right)
 
-    case POST -> Root / "forward" =>
-      commands.enqueueOne(Forward).flatMap(_ => Ok("Straight up"))
+    case POST -> Root / "forward" => processActionRequest(Forward)
 
-    case POST -> Root / "halt" =>
-      commands.enqueueOne(Halt).flatMap(_ => Ok("Stop right there!"))
+    case POST -> Root / "halt" => processActionRequest(Halt)
 
   }
 
@@ -160,8 +153,12 @@ object BobMain extends App {
     .mountService(bobRoute, "/api")
     .start)
 
-  val runCommands = (commands.dequeue to bob(PiController(GpioFactory.getInstance())))
+  val actionReader: Process[Task, Action] = actions.dequeue
 
-  (bobServer merge runCommands).run.run
+  val interpreter =  bob(PiController(GpioFactory.getInstance()))
+
+  val runActions = (actionReader to interpreter)
+
+  (bobServer merge runActions).run.run
 
 }

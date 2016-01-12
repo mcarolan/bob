@@ -34,8 +34,8 @@ class BobTest extends FunSuite with Matchers {
 
     (commands to bob).run.run
 
-    withClue("left motor signals") { controller.leftMotorSignals shouldBe Seq(High, Low, High, Low, Low) }
-    withClue("right moror signals") { controller.rightMotorSignals shouldBe Seq(High, Low, Low, Low, Low) }
+    withClue("left motor signals") { controller.leftMotorSignals shouldBe Seq(High, Low, Low, Low, Low) }
+    withClue("right moror signals") { controller.rightMotorSignals shouldBe Seq(High, Low, High, Low, Low) }
 
     controller.shutdownCalled shouldBe true
   }
