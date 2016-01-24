@@ -1,7 +1,6 @@
 package net.mcarolan.bob
 
 import net.mcarolan.bob.BobMain._
-import net.mcarolan.bob.RaspberryPi.{DigitalOutput, Controller}
 import org.scalatest.{Matchers, FunSuite}
 
 import scalaz.concurrent.Task
@@ -10,10 +9,8 @@ import scala.concurrent.duration._
 
 class BobTest extends FunSuite with Matchers {
 
-  import RaspberryPi.{State, High, Low}
-
   test("Bob can interpret a single Forward command") {
-    val controller = RaspberryPi.StubController()
+    val controller = StubController()
     val bob = BobMain.bob(controller)
 
     val commands: Process[Task, Action] = Process(Forward, Halt)
@@ -27,7 +24,7 @@ class BobTest extends FunSuite with Matchers {
   }
 
   test("Bob can interpret multiple commands: a Forward followed by a Left") {
-    val controller = RaspberryPi.StubController()
+    val controller = StubController()
     val bob = BobMain.bob(controller)
 
     val commands: Process[Task, Action] = Process(Forward, Halt, Left, Halt)

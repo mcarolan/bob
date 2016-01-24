@@ -1,7 +1,6 @@
 package net.mcarolan.bob
 
-import com.pi4j.io.gpio._
-
+import com.pi4j.io.gpio.GpioFactory
 import scala.concurrent.duration._
 import scala.io.StdIn
 import scalaz.concurrent.Task
@@ -11,90 +10,9 @@ import org.http4s._
 import org.http4s.dsl._
 import org.http4s.server._
 
-object RaspberryPi {
-
-  sealed trait State
-  case object High extends State
-  case object Low extends State
-
-  trait DigitalOutput {
-    def enterState(state: State): Task[Unit]
-  }
-
-  trait Controller {
-    val leftMotor: DigitalOutput
-    val rightMotor: DigitalOutput
-    def shutdown: Task[Unit]
-  }
-
-  case class PiDigitalOutput(pin: GpioPinDigitalOutput) extends DigitalOutput {
-
-    override def enterState(state: State): Task[Unit] = Task {
-      state match {
-        case High => pin.high()
-        case Low => pin.low()
-      }
-    }
-
-  }
-
-  case class PiController(controller: GpioController) extends Controller {
-
-    val leftMotor = PiDigitalOutput(controller.provisionDigitalOutputPin(RaspiPin.GPIO_07, PinState.LOW))
-    val rightMotor = PiDigitalOutput(controller.provisionDigitalOutputPin(RaspiPin.GPIO_01, PinState.LOW))
-
-    override def shutdown: Task[Unit] = Task {
-      controller.shutdown()
-    }
-
-  }
-
-  case class StubController() extends Controller {
-
-    var leftMotorSignals: Seq[State] = Seq.empty
-    var rightMotorSignals: Seq[State] = Seq.empty
-    var shutdownCalled = false
-
-    override val leftMotor: DigitalOutput = new DigitalOutput {
-
-      override def enterState(state: State): Task[Unit] = Task { leftMotorSignals = leftMotorSignals :+ state }
-
-    }
-
-    override val rightMotor: DigitalOutput = new DigitalOutput {
-
-      override def enterState(state: State): Task[Unit] = Task { rightMotorSignals = rightMotorSignals :+ state }
-
-    }
-
-    override def shutdown: Task[Unit] = Task {
-      shutdownCalled = true
-    }
-
-  }
-
-}
-
 object BobMain extends App {
 
   import RaspberryPi._
-
-  class Action(leftMotorState: State, rightMotorState: State) extends ((Controller) => Task[Unit]) {
-    def apply(controller: Controller): Task[Unit] =
-      for {
-        _ <- controller.leftMotor enterState leftMotorState
-        _ <- controller.rightMotor enterState rightMotorState
-      }
-        yield ()
-
-      override def toString =
-        s"left motor = $leftMotorState, right motor = $rightMotorState"
-  }
-
-  object Forward extends Action(High, High)
-  object Left extends Action(Low, High)
-  object Right extends Action(High, Low)
-  object Halt extends Action(Low, Low)
 
   def cleanUp(controller: Controller): Task[Unit] =
     for {
